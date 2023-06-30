@@ -1,4 +1,5 @@
 import pygame
+import nuovi30cmprova
 from nuovi30cmprova import Movimenti, queue
 import RPi.GPIO as GPIO
 import nuove_camere 
@@ -11,8 +12,12 @@ from servo import Servo
 import subprocess
 from colorama import Fore, Back, Style
 from SENS_DIST import VL6180X
+import signal
+from outro2 import outro
+
 subprocess.call('sudo pigpiod', shell=True)
 sleep(0.1)
+
 
 
 RES = WIDTH, HEIGHT = 762, 762
@@ -26,9 +31,12 @@ mov.init()
 start = 0
 Pin_errore = 12
 cam = videocamere()
+outro = outro()
+mov.piastre.begin()
 
 
 class Cell:
+	import RPi.GPIO as GPIO
 	def __init__(self, x, y):
 		self.x, self.y = x, y
 		self.walls = {'top': True, 'right': True, 'bottom': True, 'left': True}
@@ -42,10 +50,9 @@ class Cell:
 						 'u': {'u_s': Value('b', False), 'u_d': Value('b', False)}}
 		self.coo_v = Array('i', 2) 
 		self.placca = {'blu': False, 'argento': False, 'nero': False, 'objective': False, 'dislivello': False}
-		self.condizioni_esterne = {'salita': False, 'ostacolo': False}
-		self.priority = None
-		self.neighbours = []
-
+		self.condizioni_esterne = {'salita': False, 'ostacolo': False} 
+		
+		
 	def draw(self):
 		x, y = self.x * TILE, self.y * TILE
 		if self.visited:
@@ -80,10 +87,10 @@ class Cell:
 		if bool(self.colore['rosso']['rosso_d'].value):
 			pygame.draw.rect(sc, pygame.Color('red'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
 		if bool(self.colore['giallo']['giallo_s'].value):
-			pygame.draw.rect(sc, pygame.Color('yellow'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
+			pygame.draw.rect(sc, pygame.Color('gold'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
 		if bool(self.colore['giallo']['giallo_d'].value):
 			#print(self.coo_v, grid_cells.index(self))
-			pygame.draw.rect(sc, pygame.Color('yellow'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
+			pygame.draw.rect(sc, pygame.Color('gold'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
 		if bool(self.colore['verde']['verde_s'].value):
 			pygame.draw.rect(sc, pygame.Color('green'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
 		if bool(self.colore['verde']['verde_d'].value):
@@ -189,16 +196,18 @@ class Cell:
 			return False
 		return grid_cells[find_index(x, y)]
 
-	def create_dict(self):
+	def create_dict(self, cells):
 		shortest_cell_path = []
 		visitable_cell = []
-		for cell in grid_cells:
-			if not cell.visited and not all(cell.walls.values()):
-				visitable_cell.append(cell)
-		if len(visitable_cell) == 0:
-			target = grid_cells[int((cols*rows)/2)]
-			visitable_cell.append(target)
-
+		if cells == None:
+			for cell in grid_cells:
+				if not cell.visited and not all(cell.walls.values()):
+					visitable_cell.append(cell)
+			if len(visitable_cell) == 0:
+				target = grid_cells[int((cols*rows)/2)]
+				visitable_cell.append(target)
+		else:
+			visitable_cell = cells
 		#print('DICT', grid_cells.index(self))
 		for target in visitable_cell:
 			#print('TARGET', grid_cells.index(target))
@@ -229,12 +238,13 @@ class Cell:
 						if tempDist < unvisited[childCell]:
 							unvisited[childCell] = tempDist  # costo della cella non è più infinito
 							if childCell.placca['nero']:
-								unvisited[childCell] += 500
+								unvisited[childCell] += 9999
 							elif childCell.placca['blu']:
 								unvisited[childCell] += 3
 							revPath[childCell] = currCell
 				unvisited.pop(currCell)
 			cell = target  # target
+			#print('fwd', grid_cells.index(cell))
 			fwdPath.append(cell)
 			#print(revPath)
 			while cell != self:
@@ -276,7 +286,7 @@ class Cell:
 				elif posizione == 180 and index < len(grid_cells) - rows:
 					self.walls['bottom'] = False
 					grid_cells[index + rows].walls['top'] = False
-				elif posizione == 90 and index % 11 != 0:
+				elif posizione == 90 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
 			elif muro == 'destra':
@@ -286,14 +296,14 @@ class Cell:
 				elif posizione == 270 and index < len(grid_cells) - rows:
 					self.walls['bottom'] = False
 					grid_cells[index + rows].walls['top'] = False
-				elif posizione == 180 and index % 11 != 0:
+				elif posizione == 180 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
 				elif posizione == 90 and index > rows - 1:
 					self.walls['top'] = False
 					grid_cells[index - rows].walls['bottom'] = False
 			elif muro == 'sinistra':
-				if posizione == 0 and index % 11 != 0:
+				if posizione == 0 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
 				elif posizione == 270 and index > rows - 1:
@@ -309,7 +319,7 @@ class Cell:
 				if posizione == 0 and index < len(grid_cells) - rows:
 					self.walls['bottom'] = False
 					grid_cells[index + rows].walls['top'] = False
-				elif posizione == 270 and index % 11 != 0:
+				elif posizione == 270 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
 				elif posizione == 180 and index > rows - 1:
@@ -351,67 +361,75 @@ class Cell:
 		
 	def vittima(self, vittima_s, vittima_d, posizione, before_cell):
 		#print(bool(grid_cells[5].colore['giallo']['giallo_d'].value))
-		#print('UAUAU', grid_cells.index(before_cell))
-		trovato = False		
-		if vittima_s >= 7 and vittima_s <= 9 and self.coo_v[0] == 0 and before_cell.ultima_vittima(vittima_s):
-			trovato = True
-			self.coo_v[0] = self.define_coo(posizione, 'sinistra', 'lettera')[0]
-			self.coo_v[1] = self.define_coo(posizione, 'sinistra', 'lettera')[1]
-			#mov.ser.setfermo(0)	
-			if vittima_s == 7:
-				self.lettere['u']['u_s'].value = not self.lettere['u']['u_s'].value
-				servo.U_sinistra()
-			elif vittima_s == 8:
-				self.lettere['h']['h_s'].value = not self.lettere['h']['h_s'].value
-				servo.H_sinistra()
-			elif vittima_s == 9:
-				self.lettere['s']['s_s'].value = not self.lettere['s']['s_s'].value
-				servo.S_sinistra()
-			#GPIO.output(Pin_errore, GPIO.HIGH)
-		elif vittima_d >= 10 and vittima_d <= 12 and self.coo_v[0] == 0 and before_cell.ultima_vittima(vittima_d):
-			trovato = True
-			self.coo_v[0] = self.define_coo(posizione, 'destra', 'lettera')[0]
-			self.coo_v[1] = self.define_coo(posizione, 'destra', 'lettera')[1]
-			#mov.ser.setfermo(0)
-			if vittima_d == 10:
-				self.lettere['u']['u_d'].value = not self.lettere['u']['u_d'].value
-				servo.U_destra()
-			elif vittima_d == 11:
-				self.lettere['h']['h_d'].value = not self.lettere['h']['h_d'].value
-				servo.H_destra()
-			elif vittima_d == 12:
-				self.lettere['s']['s_d'].value = not self.lettere['s']['s_d'].value
-				servo.S_destra()
-			#GPIO.output(Pin_errore, GPIO.HIGH)
-		elif vittima_s >= 1 and vittima_s <= 3 and self.coo_v[0]== 0 and before_cell.ultima_vittima(vittima_s):
-			self.coo_v[0] = self.define_coo(posizione, 'sinistra', 'colore')[0]
-			self.coo_v[1] = self.define_coo(posizione, 'sinistra', 'colore')[1] 
-			#mov.ser.setfermo(0)
-			if vittima_s == 1:
-				self.colore['giallo']['giallo_s'].value = not self.colore['giallo']['giallo_s'].value
-				servo.giallo_sinistra()
-			elif vittima_s == 2:
-				self.colore['rosso']['rosso_s'].value = not self.colore['rosso']['rosso_s'].value
-				servo.rosso_sinistra()
-			elif vittima_s == 3:
-				self.colore['verde']['verde_s'].value = not self.colore['verde']['verde_s'].value
-				servo.verde_sinistra()
-			#GPIO.output(Pin_errore, GPIO.HIGH)
-		elif vittima_d >= 4 and vittima_d <= 6 and self.coo_v[0]== 0 and before_cell.ultima_vittima(vittima_d):
-			self.coo_v[0] = self.define_coo(posizione, 'destra', 'colore')[0]
-			self.coo_v[1] = self.define_coo(posizione, 'destra', 'colore')[1]
-			mov.ser.setfermo(0)
-			sleep(2)
-			if vittima_d == 4:
-				self.colore['giallo']['giallo_d'].value = not self.colore['giallo']['giallo_d'].value
-				servo.giallo_destra()
-			elif vittima_d == 5:
-				self.colore['rosso']['rosso_d'].value = not self.colore['rosso']['rosso_d'].value
-				servo.rosso_destra()
-			elif vittima_d == 6:
-				self.colore['verde']['verde_d'].value = not self.colore['verde']['verde_d'].value
-				servo.verde_destra()
-			#GPIO.output(Pin_errore, GPIO.HIGH)
+		#print('UAUAU', grid_cells.index(before_cell), grid_cells.index(self))
+		trovato = False	
+		if not self.placca['nero']:	 # no vittime nella placca nera
+			if vittima_s >= 7 and vittima_s <= 9 and self.coo_v[0] == 0 and before_cell.ultima_vittima(vittima_s):
+				trovato = True
+				self.coo_v[0] = self.define_coo(posizione, 'sinistra', 'lettera')[0]
+				self.coo_v[1] = self.define_coo(posizione, 'sinistra', 'lettera')[1]
+				with open('fermo.txt', 'w') as file:
+					file.write(str(True))
+				if vittima_s == 7:
+					self.lettere['u']['u_s'].value = not self.lettere['u']['u_s'].value
+					servo.U_sinistra()
+				elif vittima_s == 8:
+					self.lettere['h']['h_s'].value = not self.lettere['h']['h_s'].value
+					servo.H_sinistra()
+				elif vittima_s == 9:
+					self.lettere['s']['s_s'].value = not self.lettere['s']['s_s'].value
+					servo.S_sinistra()
+				with open('fermo.txt', 'w') as file:
+					file.write(str(False))
+			elif vittima_d >= 10 and vittima_d <= 12 and self.coo_v[0] == 0 and before_cell.ultima_vittima(vittima_d):
+				trovato = True
+				self.coo_v[0] = self.define_coo(posizione, 'destra', 'lettera')[0]
+				self.coo_v[1] = self.define_coo(posizione, 'destra', 'lettera')[1]
+				with open('fermo.txt', 'w') as file:
+					file.write(str(True))
+				if vittima_d == 10:
+					self.lettere['u']['u_d'].value = not self.lettere['u']['u_d'].value
+					servo.U_destra()
+				elif vittima_d == 11:
+					self.lettere['h']['h_d'].value = not self.lettere['h']['h_d'].value
+					servo.H_destra()
+				elif vittima_d == 12:
+					self.lettere['s']['s_d'].value = not self.lettere['s']['s_d'].value
+					servo.S_destra()
+				with open('fermo.txt', 'w') as file:
+					file.write(str(False))
+			elif vittima_s >= 1 and vittima_s <= 3 and self.coo_v[0]== 0 and before_cell.ultima_vittima(vittima_s):
+				self.coo_v[0] = self.define_coo(posizione, 'sinistra', 'colore')[0]
+				self.coo_v[1] = self.define_coo(posizione, 'sinistra', 'colore')[1] 
+				with open('fermo.txt', 'w') as file:
+					file.write(str(True))
+				if vittima_s == 1:
+					self.colore['giallo']['giallo_s'].value = not self.colore['giallo']['giallo_s'].value
+					servo.giallo_sinistra()
+				elif vittima_s == 2:
+					self.colore['rosso']['rosso_s'].value = not self.colore['rosso']['rosso_s'].value
+					servo.rosso_sinistra()
+				elif vittima_s == 3:
+					self.colore['verde']['verde_s'].value = not self.colore['verde']['verde_s'].value
+					servo.verde_sinistra()
+				with open('fermo.txt', 'w') as file:
+					file.write(str(False))
+			elif vittima_d >= 4 and vittima_d <= 6 and self.coo_v[0]== 0 and before_cell.ultima_vittima(vittima_d):
+				self.coo_v[0] = self.define_coo(posizione, 'destra', 'colore')[0]
+				self.coo_v[1] = self.define_coo(posizione, 'destra', 'colore')[1]
+				with open('fermo.txt', 'w') as file:
+					file.write(str(True))
+				if vittima_d == 4:
+					self.colore['giallo']['giallo_d'].value = not self.colore['giallo']['giallo_d'].value
+					servo.giallo_destra()
+				elif vittima_d == 5:
+					self.colore['rosso']['rosso_d'].value = not self.colore['rosso']['rosso_d'].value
+					servo.rosso_destra()
+				elif vittima_d == 6:
+					self.colore['verde']['verde_d'].value = not self.colore['verde']['verde_d'].value
+					servo.verde_destra()
+				with open('fermo.txt', 'w') as file:
+					file.write(str(False))
 		return trovato
 		
 	def ultima_vittima(self, v):
@@ -431,7 +449,7 @@ class Cell:
 			return False 
 		else:
 			return True
-			
+		
 def camere(queue):
 	last_c = centre
 	last_p = 0
@@ -445,12 +463,16 @@ def camere(queue):
 		else:
 			identificate = queue.get()
 			i = queue.get()
-			#print(identificate, i)
+			print(identificate, i)
 			if identificate == 'cella':
-				before_cell = current_cell
-				last_b = grid_cells.index(before_cell)
-				current_cell = grid_cells[i]
-				last_c = i
+				if last_c != i:
+					before_cell = current_cell
+					last_b = grid_cells.index(before_cell)
+					current_cell = grid_cells[i]
+					last_c = i
+				else:
+					current_cell = grid_cells[last_c]
+					before_cell = grid_cells[last_b]
 				posizione = last_p
 			elif identificate == 'posizione':
 				posizione = i
@@ -459,15 +481,15 @@ def camere(queue):
 				before_cell = grid_cells[last_b]
 			
 		img, img1 = cam.telecamere()
-		lettera = cam.get_letter(img, 'sinistra')
-		lettera1 = cam.get_letter(img1, 'destra')
-		print(lettera, lettera1)
-		trovato = current_cell.vittima(lettera, lettera1, posizione, before_cell)
+		lettera = cam.get_letter(img, 'destra')
+		lettera1 = cam.get_letter(img1, 'sinistra')
+		#print(lettera, lettera1)
+		trovato = current_cell.vittima(lettera1, lettera, posizione, before_cell)
 		if not trovato:
-			color = cam.get_color(img, 'sinistra')
-			color1 = cam.get_color(img1, 'destra')
-			trovato = current_cell.vittima(color, color1, posizione, before_cell)
-		#print('camere', grid_cells.index(current_cell), posizione)
+			color = cam.get_color(img, 'destra')
+			color1 = cam.get_color(img1, 'sinistra')
+			trovato = current_cell.vittima(color1, color, posizione, before_cell)
+			#print('colori', color, color1)
 
 def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 	index_before = grid_cells.index(cell_before)
@@ -475,69 +497,80 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 	i = index_cell - index_before
 	#print(index_cell, index_before, posizione_dij)
 	if posizione_dij == 0:
-		if i == - rows:
+		if i == - rows and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
 		elif i == 1:
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 270
 		elif i == - 1:
 			muoviamoci.append('gira a sinistra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 90
 		elif i == rows:
 			muoviamoci.append('gira a destra')
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 180
 	elif posizione_dij == 90:   # <--
-		if i == - 1:
+		if i == - 1 and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
 		elif i == - rows:
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 0
 		elif i == rows:
 			muoviamoci.append('gira a sinistra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 180
 		elif i == 1:
 			muoviamoci.append('gira a destra')
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 270
 	elif posizione_dij == 270:  # -->
-		if i == 1:
+		if i == 1 and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
 		elif i == rows:
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 180
 		elif i == - rows:
 			muoviamoci.append('gira a sinistra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 0
 		elif i == -1:
 			muoviamoci.append('gira a destra')
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 90
 	elif posizione_dij == 180:
-		if i == rows:
+		if i == rows and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
 		elif i == - 1:
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
-			
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 90
 		elif i == 1:
 			muoviamoci.append('gira a sinistra')
-			muoviamoci.append('avanti')
+			if not cell.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 270
 		elif i == -rows:
 			muoviamoci.append('gira a destra')
 			muoviamoci.append('gira a destra')
-			muoviamoci.append('avanti')
+			if not cell_before.placca['dislivello']:
+				muoviamoci.append('avanti')
 			posizione_dij = 0
 	return posizione_dij, muoviamoci
 
@@ -562,11 +595,18 @@ def draw_base():
 	sc.fill(pygame.Color('darkslategray'))
 	[cell.draw() for cell in grid_cells]
 
+'''	
+def closing(signum, frame):
+	print("Chiusura dello script...")
+	led.led_cam_OFF()
+
+signal.signal(signal.SIGINT, closing)
+'''	
 pygame.init()
 sc = pygame.display.set_mode(RES)  # window
 clock = pygame.time.Clock()
 robot_img = pygame.image.load(
-	"/home/sensaschei2/Desktop/codici macc nuova/robot.png").convert()  # ottenere l'immagine
+	"/home/sensaschei2/Desktop/codici_macc_nuova/robot.png").convert()  # ottenere l'immagine
 # resize
 width = robot_img.get_rect().width
 height = robot_img.get_rect().height
@@ -582,97 +622,174 @@ global centre
 centre = int(cols * rows/2)
 current_cell = grid_cells[centre]
 
-target = current_cell 
+checkpoint = current_cell 
 next_cell = current_cell
 x_robot, y_robot = current_cell.x, current_cell.y
 objective = current_cell
 muoviamoci = []
 check = []
+celle_lack = []
 togli_muro = True
 before_cell = current_cell
-
-				
+accendere_led = True
+back = True				
 if __name__ == '__main__':
 	#queue = Queue()
-	'''
+	with open('fermo.txt', 'w') as file:
+		file.write(str(False))
 	queue.put('cella')
 	queue.put(grid_cells.index(current_cell)) 
 	queue.put('posizione')
 	queue.put(posizione)      
-	#p_cam = Process(target=camere, args=(queue, ))      
+	p_cam = Process(target=camere, args=(queue, ))      
 	p_cam.start()
-	'''
+	pin_digitale = 27
+	start = 23
+	lack = 24
+	GPIO.setmode(GPIO.BCM)
+	GPIO.setup(pin_digitale, GPIO.OUT)
+	GPIO.setup(23, GPIO.IN)
+	GPIO.setup(24, GPIO.IN)
+	GPIO.setwarnings(False)
+	GPIO.output(pin_digitale, GPIO.LOW)
+	mov.partenza()
 	while True:
-		led.led_cam_ON()
+		with open('fermo.txt', 'r') as file:
+			flag = file.readline().strip()
+		flag = False if flag == "False" else True
+		if accendere_led and not flag:
+			led.led_cam_ON()
 		x_robot, y_robot = current_cell.x, current_cell.y
-		#print('AAAAAAA', grid_cells.index(current_cell))
 		current_cell.visited = True
 		draw_base()
-		draw_robot(posizione, x_robot, y_robot)	
-		for event in pygame.event.get():
-			if event.type == pygame.QUIT:
-				exit()
-		
-		if len(muoviamoci) != 0:
-			next_cell, posizione, condizione = current_cell.new_cell(muoviamoci, posizione)
-			if next_cell != current_cell:
-				before_cell = current_cell
-			print('CONDIZIONE', condizione)
-			img, img1 = cam.telecamere()
-			lettera = cam.get_letter(img, 'sinistra')
-			lettera1 = cam.get_letter(img1, 'destra')
-			print('lettere', lettera, lettera1)
-			trovato = next_cell.vittima(lettera, lettera1, posizione, before_cell)
-			if not trovato:
-				color = cam.get_color(img, 'sinistra')
-				color1 = cam.get_color(img1, 'destra')
-				print('colori', color, color1)
-				trovato = next_cell.vittima(color, color1, posizione, before_cell)
-			if condizione == 'nero':
-				next_cell.visited = True
-				next_cell.placca['nero'] = True
-				objective = current_cell
-				next_cell = current_cell  # rimango sulla stessa cell
-			elif condizione == 'blu':
-				next_cell.visited = True
-				next_cell.placca['blu'] = True
-			elif condizione == 'argento':
-				next_cell.visited = True
-				next_cell.placca['argento'] = True
-			elif condizione == 'discesa' or condizione == 'salita':
-				next_cell.visited = True
-				next_cell.placca['dislivello'] = True
-				i = grid_cells.index(next_cell)  # number in grid of dislivello
-				if posizione == 0:
-					next_cell = grid_cells[i - rows]
-					next_cell.destroy_wall(posizione, ['dietro'])
-				elif posizione == 90:
-					next_cell = grid_cells[i - 1]
-					next_cell.destroy_wall(posizione, ['destra'])
-				elif posizione == 180:
-					next_cell = grid_cells[i + rows]
-					next_cell.destroy_wall(posizione, ['avanti'])
-				elif posizione == 270:
-					next_cell = grid_cells[i + 1]
-					next_cell.destroy_wall(posizione, ['sinistra'])
-				objective = next_cell							
-			muoviamoci.pop(0)
+		draw_robot(posizione, x_robot, y_robot)
+		if (GPIO.input(start) == True) and not flag:
+			back = True
+			if len(muoviamoci) != 0:
+				next_cell, posizione, array_cond = current_cell.new_cell(muoviamoci, posizione)			
+				print('CONDIZIONE', array_cond)
+				if next_cell != current_cell and next_cell != checkpoint and not next_cell.placca['argento']:
+					celle_lack.append(next_cell)
+				elif next_cell == checkpoint:  # nel caso passasse nella cella iniziale
+					print('qua')
+					celle_lack.clear()
+				if array_cond != None:  # caso in cui gira a dx o sx
+					for condizione in array_cond:
+						if condizione == 'nero':
+							next_cell.visited = True
+							next_cell.placca['nero'] = True
+							next_cell.posizione = posizione 
+							objective = current_cell
+							next_cell = current_cell  # rimango sulla stessa cell
+						elif condizione == 'blu':
+							next_cell.visited = True
+							next_cell.placca['blu'] = True
+						elif condizione == 'argento':
+							next_cell.visited = True
+							next_cell.placca['argento'] = True
+							#checkpoint = next_cell
+							#celle_lack.clear()
+						elif condizione == 'discesa' or condizione == 'salita':
+							print('cella salita?', grid_cells.index(next_cell))
+							next_cell.visited = True
+							next_cell.placca['dislivello'] = True
+							i = grid_cells.index(next_cell)  # number in grid of dislivello
+							next_cell.destroy_wall(posizione, ['avanti'])
+							if posizione == 0:
+								next_cell = grid_cells[i - rows]
+							elif posizione == 90:
+								next_cell = grid_cells[i - 1]
+							elif posizione == 180:
+								next_cell = grid_cells[i + rows]
+							elif posizione == 270:
+								next_cell = grid_cells[i + 1]
+							print('cella sucessiva?', grid_cells.index(next_cell))
+							next_cell.posizione = posizione 
+							if objective == grid_cells[i]:  # se l'obiettivo è la cella della salita
+								objective = next_cell  # obiettivo diventa la cella successiva
+						elif condizione == 'finecorsa':
+							next_cell = current_cell
+							muoviamoci.insert(0, 'avanti')	
+							print('finecorsaaaa', muoviamoci)
+					#print(grid_cells.index(next_cell), next_cell.walls, grid_cells.index(objective))		
+				muoviamoci.pop(0)
+				togli_muro = True
+			else: 
+				if togli_muro:
+					for i in range (0, 3):
+						check = mov.check_sens()
+					print(check)
+					togli_muro = False	
+					#print(grid_cells.index(current_cell))
+				for muro in check:
+					current_cell.destroy_wall(posizione, [muro])
+			if objective == current_cell:
+				objective.placca['objective'] = False
+				path, muoviamoci = current_cell.create_dict(None)
+				print('MUOVIAMOCI', muoviamoci)
+				objective = path[-1]
+				objective.placca['objective'] = True
+				if len(muoviamoci) == 0:
+					led.led_cam_OFF()
+					accendere_led = False
+					outro.play(outro.underworld_melody, outro.underworld_tempo, 1.3, 0.800)	
+			current_cell = next_cell
+		elif (GPIO.input(start) == False) and back and len(celle_lack) > 0:  
+			current_cell = checkpoint
+			posizione = 0
+			cells_dik = []
+			#print(len(celle_lack))
+			if len(celle_lack) == 1:
+				lack_dik = celle_lack[-1]
+				cells_dik.append(lack_dik)
+			else:
+				pen_cel = celle_lack[-2]
+				ult_cel = celle_lack[-1]
+				cells_dik.append(pen_cel)
+				cells_dik.append(ult_cel)  # nel ritornare indietro magari
+			path, _ = current_cell.create_dict(cells_dik)
+			for cella in cells_dik:
+				cella.visited = False
+				cella.walls = {key: True for key in cella.walls}
+				for inner_dict in cella.colore:
+					for object in cella.colore[inner_dict]:
+						cella.colore[inner_dict][object].value = False
+				for inner_dict in cella.lettere:
+					for object in cella.lettere[inner_dict]:
+						cella.lettere[inner_dict][object].value = False
+				cella.coo_v[0] = 0
+				cella.coo_v[1] = 0
+				cella.placca = {key: False for key in cella.placca}
+				cella.condizioni_esterne = {key: False for key in cella.condizioni_esterne}
+				i = grid_cells.index(cella)
+				for wall in cella.walls:
+					if wall == 'top':
+						grid_cells[i - rows].walls['bottom'] = True
+					if wall == 'bottom':
+						grid_cells[i + rows].walls['top'] = True
+					if wall == 'left':
+						grid_cells[i - 1].walls['right'] = True
+					if wall == 'right':
+						grid_cells[i + 1].walls['left'] = True
+			print(len(path))
+			i_clean = grid_cells.index(path[-1])
+			i_main = grid_cells.index(path[-2])
+			cond = i_main - i_clean
+			if cond == 1:
+				path[-1].destroy_wall(0, ['destra'])
+			elif cond == -1:
+				path[-1].destroy_wall(0, ['sinistra'])
+			elif cond == -rows:
+				path[-1].destroy_wall(0, ['avanti'])
+			elif cond == rows:
+				path[-1].destroy_wall(0, ['dietro'])
+			objective.placca['objective'] = False  # togliere il viola nel caso l'objective non fosee ancora stato visto 
+			celle_lack.clear()
+			muoviamoci.clear()
+			objective = current_cell
+			next_cell = current_cell
 			togli_muro = True
-		else: 
-			if togli_muro:
-				for i in range (0, 3):
-					check = mov.check_sens()
-				print(check)
-				togli_muro = False
-				#print('qua')	
-			for muro in check:
-				current_cell.destroy_wall(posizione, [muro])
-		if objective == current_cell:
-			objective.placca['objective'] = False
-			path, muoviamoci = current_cell.create_dict()
-			#print(muoviamoci)
-			objective = path[-1]
-			objective.placca['objective'] = True
-		current_cell = next_cell
+			back = False
+				
 		pygame.display.flip()
 		clock.tick(60)
