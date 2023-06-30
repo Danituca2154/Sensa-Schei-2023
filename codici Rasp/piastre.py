@@ -88,7 +88,7 @@ class piastre:
 			self.situazione = 0
 			sleep(0.05)
 			
-			#prox = apds.getLEDBoost()
+			#prox = apds.readProximity()
 			#print('prossimità: ',prox)
 			if apds.isLightAvailable():
 				val = apds.readAmbientLight()
@@ -98,19 +98,19 @@ class piastre:
 				#self.led.led_sotto_OFF()
 				#if val != oval:
 				
-				#print("<>AmbientLight={} (R: {}, G: {}, B: {})".format(val, r, g, b))
+				print("<>AmbientLight={} (R: {}, G: {}, B: {})".format(val, r, g, b))
 				#	oval = val
 				#	break
 				if r>3000 and g>3000 and b>3500:
-					print("bianco/argento")
+					#print("bianco/argento")
 					val = apds.readAmbientLight()
-					if val<16000 :
+					if val<17000 and b<6000 :
 						print("bianco")
-					if val>16000 :
+					if val>17000 :
 						print("argento")
 						return 'argento'
 					break
-				if r>250 and g>800 and b>1300 and b<2000:
+				if r>250 and g>800 and b>1300 and b<2400:
 					print("blu")
 					self.situazione = 2
 					return 'blu'
@@ -130,5 +130,5 @@ if __name__ == '__main__':
 	while True:
 	   
 		#sn.sensori_check()
-		sn.prova()
+		sn.ferma()
 	  

@@ -5,39 +5,41 @@ import RPi.GPIO as GPIO
 
 GPIO.setmode(GPIO.BCM)
 GPIO.setwarnings(False)
-GPIO.setup(23, GPIO.OUT)# buzz
+
 GPIO.setup(22, GPIO.OUT)# led scivoli sinistra
-GPIO.setup(27, GPIO.OUT) #led scivolidestra
+#GPIO.setup(27, GPIO.OUT) #led scivolidestra
 
-
-GPIO.output(23, GPIO.LOW)
 GPIO.output(22, GPIO.LOW)
-GPIO.output(27, GPIO.LOW)
+#GPIO.output(27, GPIO.LOW)
 
 
-LED_D = 27
+LED_D = 22
 LED_S = 22
 BUZZ = 6
 
 class Servo:
-
 	
 	def init(self):
 		self.SERVO = 18
 		self.pi = pigpio.pi()
 		self.pi.set_mode(self.SERVO, pigpio.OUTPUT)
-		self.pi.set_servo_pulsewidth(self.SERVO, 1650) # posizione neutra
+		self.pi.set_servo_pulsewidth(self.SERVO, 1700) # posizione neutra
+		self.contatore = 0
 		
 	def sinistra(self):
-		self.pi.set_servo_pulsewidth(self.SERVO, 2200) # posizione massima
-		sleep(0.5)
-		self.pi.set_servo_pulsewidth(self.SERVO, 1650) # posizione neutra
-		sleep(0.5)
+		if self.contatore < 12:
+			self.pi.set_servo_pulsewidth(self.SERVO, 2250) # posizione massima
+			sleep(0.5)
+			self.pi.set_servo_pulsewidth(self.SERVO, 1700) # posizione neutra
+			sleep(0.5)
+			self.contatore += 1 
 	def destra(self):
-		self.pi.set_servo_pulsewidth(self.SERVO, 1200) # posizione minima
-		sleep(0.5)
-		self.pi.set_servo_pulsewidth(self.SERVO, 1650) # posizione neutra
-		sleep(0.5)
+		if self.contatore < 12:
+			self.pi.set_servo_pulsewidth(self.SERVO, 1100) # posizione minima
+			sleep(0.5)
+			self.pi.set_servo_pulsewidth(self.SERVO, 1700) # posizione neutra
+			sleep(0.5)
+			self.contatore += 1 
 		
 				
 	def H_sinistra(self):
@@ -49,14 +51,14 @@ class Servo:
 		
 		GPIO.output(LED_S, GPIO.HIGH)
 		GPIO.output(BUZZ, GPIO.HIGH)
-		self.sinistra()	
+		self.sinistra() 
 		GPIO.output(BUZZ, GPIO.LOW)
 		GPIO.output(LED_S, GPIO.LOW)
 		sleep(0.5)
 		
 		GPIO.output(LED_S, GPIO.HIGH)
 		GPIO.output(BUZZ, GPIO.HIGH)
-		self.sinistra()	
+		self.sinistra()
 		GPIO.output(BUZZ, GPIO.LOW)
 		GPIO.output(LED_S, GPIO.LOW)
 		sleep(0.5)
@@ -382,10 +384,13 @@ class Servo:
 if __name__ == '__main__':
 	servo = Servo()
 	servo.init()
+	
 	while True:
-		servo.rosso_destra()
+		servo.destra()
+		print(servo.contatore)
 		sleep(2)
-		servo.rosso_sinistra()
+		servo.sinistra()
+		print(servo.contatore)
 		sleep(2)
-		
+	
 		

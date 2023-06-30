@@ -21,6 +21,7 @@ class videocamere:
 		GPIO.setmode(GPIO.BCM)
 		GPIO.setwarnings(False)
 		GPIO.setup(17, GPIO.OUT)
+		GPIO.setup(23, GPIO.IN)
 		#GPIO.output(17, GPIO.HIGH)
 		while True:
 			ret, frame = cap.read()
@@ -41,15 +42,15 @@ class videocamere:
 			t1 = time.time()  # time
 			timeRunning = (t1 - t0)
 			cv2.waitKey(1)
-			if timeRunning >= 0.2:  # 2 seconds
-				out = cv2.imwrite('/home/sensaschei2/Desktop/codici macc nuova/immagine/capture.jpg', rgb)
-				out1 = cv2.imwrite('/home/sensaschei2/Desktop/codici macc nuova/immagine/capture1.jpg', rgb1)
+			if timeRunning >= 0.1:  # 2 seconds
+				out = cv2.imwrite('/home/sensaschei2/Desktop/codici_macc_nuova/immagine/capture.jpg', rgb)
+				out1 = cv2.imwrite('/home/sensaschei2/Desktop/codici_macc_nuova/immagine/capture1.jpg', rgb1)
 				break
 		#cv2.destroyAllWindows()
 
-		img = cv2.imread('/home/sensaschei2/Desktop/codici macc nuova/immagine/capture.jpg', 1)    # show immagine catturata
-		img1 = cv2.imread('/home/sensaschei2/Desktop/codici macc nuova/immagine/capture1.jpg', 1)
-		print('prese')
+		img = cv2.imread('/home/sensaschei2/Desktop/codici_macc_nuova/immagine/capture.jpg', 1)    # show immagine catturata
+		img1 = cv2.imread('/home/sensaschei2/Desktop/codici_macc_nuova/immagine/capture1.jpg', 1)
+		#print('prese')
 		return img, img1  
 			
 	def get_color(self, img, lato):
@@ -90,21 +91,23 @@ class videocamere:
 						colore = 'verde'
 					elif i == 2:
 						colore = 'rosso'
-		if (colore == 'giallo' and lato == 'sinistra'): #sinistra giallo
-			lettera_t=1
-		elif(colore == 'rosso' and lato == 'sinistra'): #sinistra rosso
-			lettera_t=2
-		elif(colore == 'verde' and lato == 'sinistra'): #sinistra verde
-			lettera_t=3
-		elif(colore == 'giallo' and lato == 'destra'): #destra giallo
-			lettera_t=4
-		elif(colore == 'rosso' and lato == 'destra'): #destra rosso
-			lettera_t=5
-		elif(colore == 'verde' and lato == 'destra'): #destra verde
-			lettera_t=6			
+		if (GPIO.input(23) == True):
+			if (colore == 'giallo' and lato == 'sinistra'): #sinistra giallo
+				lettera_t=1
+			elif(colore == 'rosso' and lato == 'sinistra'): #sinistra rosso
+				lettera_t=2
+			elif(colore == 'verde' and lato == 'sinistra'): #sinistra verde
+				lettera_t=3
+			elif(colore == 'giallo' and lato == 'destra'): #destra giallo
+				lettera_t=4
+			elif(colore == 'rosso' and lato == 'destra'): #destra rosso
+				lettera_t=5
+			elif(colore == 'verde' and lato == 'destra'): #destra verde
+				lettera_t=6			
+			else:
+				lettera_t = 40 
 		else:
-			lettera_t = 40 
-			   
+			lettera_t = 40	   
 		return lettera_t
 		
 	def get_letter(self, img, lato):
@@ -243,31 +246,24 @@ class videocamere:
 							counter += 1
 					if counter == len(punti_or) + len(punti_ver):
 						letter = 'S'
-						
-		if(letter == 'U' and lato == 'sinistra'): #sinistra 
-			lettera_t=7
-		elif(letter == 'H' and lato == 'sinistra'): #sinistra 
-			lettera_t=8
-		elif(letter == 'S' and lato == 'sinistra'): #sinistra 
-			lettera_t=9
-		elif(letter == 'U' and lato == 'destra'): #destra 
-			lettera_t=10
-		elif(letter == 'H' and lato == 'destra'): #destra 
-			lettera_t=11
-		elif(letter == 'S' and lato == 'destra'): #destra 
-			lettera_t=12
-		else:
-			lettera_t=40
-			
+		if (GPIO.input(23) == True):				
+			if(letter == 'U' and lato == 'sinistra'): #sinistra 
+				lettera_t=7
+			elif(letter == 'H' and lato == 'sinistra'): #sinistra 
+				lettera_t=8
+			elif(letter == 'S' and lato == 'sinistra'): #sinistra 
+				lettera_t=9
+			elif(letter == 'U' and lato == 'destra'): #destra 
+				lettera_t=10
+			elif(letter == 'H' and lato == 'destra'): #destra 
+				lettera_t=11
+			elif(letter == 'S' and lato == 'destra'): #destra 
+				lettera_t=12
+			else:
+				lettera_t=40
+		else: 
+			lettera_t = 40
 		return lettera_t
-			
-	def definitivo(self, val_s, val_d):
-		if val_s != 40:
-			return val_s
-		elif val_d != 40:
-			return val_d 
-		else:
-			return 40
 			
 def cambio_color(punto1, punto2, direttrice):
 	color_start = 0
