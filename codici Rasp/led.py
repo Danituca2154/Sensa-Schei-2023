@@ -67,6 +67,8 @@ if __name__ == '__main__':
 	sleep(1)
 	while True:
 		try:
-			led.led_cam_ON()
+			led.led_sotto_ON()
+			sleep(5)
+			led.led_cam_OFF()
 		except KeyboardInterrupt:
 			tutti_led_OFF()
