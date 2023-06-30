@@ -42,9 +42,9 @@ class PIDController:
 		print('setpoint', self.setpoint)
 		
 		# Impostazione dei coefficienti del PID
-		Kp = 60
-		Ki = 20
-		Kd = 1
+		Kp = 160
+		Ki = 10
+		Kd = 0
 		self.error_sum = 0.0
 		self.last_error = 0.0
 		self.last_time = time.time()
@@ -52,22 +52,27 @@ class PIDController:
 		
 		serial = Serial()
 		while True:
-			# Simulazione della lettura del giroscopio
-			# Nel tuo caso, dovrai leggere il valore reale dal tuo giroscopio
-			gyro_value = bno.readAngle()
-			print(gyro_value)
+			arduino = serial.read()
+			if arduino == 80:
+				self.error_sum = 0.0
+				self.last_error = 0.0
+			if arduino != 80:
+				# Simulazione della lettura del giroscopio
+				# Nel tuo caso, dovrai leggere il valore reale dal tuo giroscopio
+				gyro_value = bno.readAngle()
+				print(gyro_value)
 
-			# Calcola l'output del controllore PID
-			output = pid.update(gyro_value)
-			print('output: ',output)
-			# Utilizza l'output per controllare i due motori separatamente
-			right_motor_speed = -output
-			left_motor_speed = output
+				# Calcola l'output del controllore PID
+				output = pid.update(gyro_value)
+				print('output: ',output)
+				# Utilizza l'output per controllare i due motori separatamente
+				right_motor_speed = -output
+				left_motor_speed = output
 
-			# Effettua altre azioni per controllare i motori e gestire il movimento
-			lol =serial.setavanti(2000-right_motor_speed, 2000-left_motor_speed)
-			
-			time.sleep(0.1)  # Attendi per un breve periodo prima di ripetere il ciclo
+				# Effettua altre azioni per controllare i motori e gestire il movimento
+				lol =serial.setavanti(2000-right_motor_speed, 2000-left_motor_speed)
+				
+				time.sleep(0.1)  # Attendi per un breve periodo prima di ripetere il ciclo
 			
 		
 if __name__ == '__main__':

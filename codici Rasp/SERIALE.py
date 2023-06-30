@@ -65,10 +65,10 @@ class Serial:
 		self.clean()
 		impulsi = self.read()
 		#print('ecco',impulsi)
-		if impulsi== 69:
+		if impulsi == 69:
 			self.clean()
 		#byte di velocità
-		MAXvelocita = 5000
+		MAXvelocita = 6000
 		DIVvelocita = 47.24
 		if(velocita1>MAXvelocita):
 			velocita1= MAXvelocita
@@ -78,6 +78,7 @@ class Serial:
 		velocita2= round(velocita2/DIVvelocita)#max 2^7 (127)
 		byteOut[1] = velocita1
 		self.write(byteOut[1])
+		self.clean()
 		byteOut[2] = velocita2
 		self.write(byteOut[2])
 		return impulsi
@@ -167,6 +168,21 @@ class Serial:
 		
 		for ind in range(nByte):
 			self.write(byteOut[ind])
+	def setfermoflag(self, velocita):
+		nByte = 3
+		byteOut =[0]*nByte
+		#byte di controllo
+		bitVel1= 0
+		bitVel2= 0
+		if(velocita<0):
+			velocita = -velocita
+			bitVel = 0
+		byteOut[0] = (1<<7)|(0<<6)|(0<<5)|(1<<4)|(1<<3)|(bitVel1<<1)|(bitVel2<<0)
+		byteOut[1] = 0
+		byteOut[2] = 0
+		
+		for ind in range(nByte):
+			self.write(byteOut[ind])
 	#-------------------------------------------------------------------------------------------------------------
 	def azzeroimpulsi(self):
 		nByte = 3
@@ -176,12 +192,13 @@ class Serial:
 		byteOut[2] = 0
 		for ind in range(nByte):
 			self.write(byteOut[ind])
+		'''
 		byteOut[0] = (1<<7)|(1<<6)|(0<<5)|(1<<4)|(1<<3)|(1<<1)|(1<<0)
 		#print(self.read())
 		byteOut[1] = 0
 		byteOut[2] = 0
 		for ind in range(nByte):
-			self.write(byteOut[ind])
+			self.write(byteOut[ind])'''
 	#--------------------------------------------------------------------------------------------------------------
 	
 		
@@ -203,7 +220,7 @@ if __name__ == '__main__':
 		
 		
 		#serial.setavanti(3000, 3000)
-		print(serial.read())
+		#print(serial.read())
 		
 		#serial.write(57)	print(serial.read())
 		#sleep(4)
