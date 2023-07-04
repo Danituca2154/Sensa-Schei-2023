@@ -20,8 +20,9 @@ sleep(0.1)
 
 
 
-RES = WIDTH, HEIGHT = 762, 762
-TILE = 40
+RES = WIDTH, HEIGHT = 1522, 762
+TILE = 20
+cols, rows = WIDTH // TILE, HEIGHT // TILE
 cols, rows = WIDTH // TILE, HEIGHT // TILE
 mov = Movimenti()
 led = Led()
@@ -49,9 +50,9 @@ class Cell:
 						 's': {'s_s' : Value('b', False), 's_d' : Value('b', False)},
 						 'u': {'u_s': Value('b', False), 'u_d': Value('b', False)}}
 		self.coo_v = Array('i', 2) 
-		self.placca = {'blu': False, 'argento': False, 'nero': False, 'objective': False, 'dislivello': False}
+		self.placca = {'blu': False, 'argento': False, 'nero': False, 'objective': False, 'dislivello': False, 'teletrasporto': False}
 		self.condizioni_esterne = {'salita': False, 'ostacolo': False} 
-		
+		self.livello = 0
 		
 	def draw(self):
 		x, y = self.x * TILE, self.y * TILE
@@ -80,7 +81,8 @@ class Cell:
 			pygame.draw.rect(sc, pygame.Color('blue'), (x + 2, y + 2, TILE - 2, TILE - 2))
 		if self.placca['dislivello']:
 			pygame.draw.rect(sc, pygame.Color('tan'), (x + 2, y + 2, TILE - 1, TILE - 1))
-
+		if self.placca['teletrasporto']:
+			pygame.draw.rect(sc, pygame.Color('lightblue'), (x + 2, y + 2, TILE - 1, TILE - 1))
 		# COLORI
 		if bool(self.colore['rosso']['rosso_s'].value):
 			pygame.draw.rect(sc, pygame.Color('red'), (self.coo_v[0], self.coo_v[1], TILE/10, TILE/10))
@@ -189,12 +191,6 @@ class Cell:
 				break
 		
 		return next_cell, posizione, mossa	
-			
-	def check_cell(self, x, y):
-		find_index = lambda x, y: x + y * cols
-		if x < 0 or x > cols - 1 or y < 0 or y > rows - 1:
-			return False
-		return grid_cells[find_index(x, y)]
 
 	def create_dict(self, cells):
 		shortest_cell_path = []
@@ -203,8 +199,9 @@ class Cell:
 			for cell in grid_cells:
 				if not cell.visited and not all(cell.walls.values()):
 					visitable_cell.append(cell)
+					#print(grid_cells.index(cell))
 			if len(visitable_cell) == 0:
-				target = grid_cells[int((cols*rows)/2)]
+				target = grid_cells[centre]
 				visitable_cell.append(target)
 		else:
 			visitable_cell = cells
@@ -225,13 +222,13 @@ class Cell:
 				for wall in currCell.walls:
 					if not currCell.walls[wall]:  # se non c'è il muro
 						if wall == 'top':
-							childCell = currCell.check_cell(currCell.x, currCell.y - 1)
+							childCell = check_cell(currCell.x, currCell.y - 1)
 						elif wall == 'right':
-							childCell = currCell.check_cell(currCell.x + 1, currCell.y)
+							childCell = check_cell(currCell.x + 1, currCell.y)
 						elif wall == 'bottom':
-							childCell = currCell.check_cell(currCell.x, currCell.y + 1)
+							childCell = check_cell(currCell.x, currCell.y + 1)
 						elif wall == 'left':
-							childCell = currCell.check_cell(currCell.x - 1, currCell.y)
+							childCell = check_cell(currCell.x - 1, currCell.y)
 						if childCell in visited:  # se è già presente vai alla prossima (per i vicoli cieci)
 							continue
 						tempDist = unvisited[currCell] + 1  # assume il numero più corto per raggiungere la casella
@@ -244,48 +241,49 @@ class Cell:
 							revPath[childCell] = currCell
 				unvisited.pop(currCell)
 			cell = target  # target
-			#print('fwd', grid_cells.index(cell))
 			fwdPath.append(cell)
-			#print(revPath)
-			while cell != self:
-				fwdPath.append(revPath[cell])
-				cell = revPath[cell]
-			fwdPath.reverse()
-			if len(shortest_cell_path) == 0 or len(fwdPath) < len(shortest_cell_path):
-				shortest_cell_path = fwdPath
-		mostra_sentiero = True
-		#for cell in shortest_cell_path:
-			#print(grid_cells.index(cell))
-		cell_before = shortest_cell_path[0]
-		posizione_dij = posizione
-		muoviamoci = []
-		while mostra_sentiero:
-			for cell in shortest_cell_path:
-				draw_base()
-				pygame.draw.rect(sc, pygame.Color('purple'), (cell.x * TILE, cell.y * TILE, TILE, TILE - 1))
-				posizione_dij, muoviamoci = define_posizione(cell_before, cell, posizione_dij, muoviamoci)
-				draw_robot(posizione, x_robot, y_robot)
-				pygame.display.flip()
-				cell_before = cell
-				clock.tick(10)
-			mostra_sentiero = False
+			#print('fwd', grid_cells.index(cell))
+			try:
+				while cell != self:
+					fwdPath.append(revPath[cell])
+					cell = revPath[cell]
+				fwdPath.reverse()
+				if len(shortest_cell_path) == 0 or len(fwdPath) < len(shortest_cell_path):
+					shortest_cell_path = fwdPath
+			except Exception as e:
+				print('errore')
+			mostra_sentiero = True
+			#for cell in shortest_cell_path:
+				#print(grid_cells.index(cell))
+			cell_before = shortest_cell_path[0]
+			posizione_dij = posizione
+			muoviamoci = []
+			while mostra_sentiero:
+				for cell in shortest_cell_path:
+					draw_base()
+					pygame.draw.rect(sc, pygame.Color('purple'), (cell.x * TILE, cell.y * TILE, TILE, TILE - 1))
+					posizione_dij, muoviamoci = define_posizione(cell_before, cell, posizione_dij, muoviamoci)
+					draw_robot(posizione, x_robot, y_robot)
+					pygame.display.flip()
+					cell_before = cell
+					clock.tick(10)
+				mostra_sentiero = False
 		return shortest_cell_path, muoviamoci # might just need the last cell
 		
 	def destroy_wall(self, posizione, muri):  # could be done with conditions for each wall
-		#cell_destra = [10, 21, 32, 43, 54, 65, 76, 87, 98, 109, 120]
-		cell_destra = [18, 37, 56, 75, 94, 113, 132, 151, 170, 189] # da cambiare se cambiano rows or cols
+		cell_destra = [75, 113, 151, 189, 227, 265, 303, 341, 379, 417, 455, 493, 531, 569, 607, 645, 683, 721, 759, 797, 835, 873, 911, 949, 987, 1025, 1063, 1101, 1139, 1177, 1215, 1253, 1291, 1329, 1367, 1405, 1443, 1481, 1519, 1557, 1595, 1633, 1671, 1709, 1747, 1785, 1823, 1861, 1899, 1937, 1975, 2013, 2051, 2089, 2127, 2165, 2203, 2241, 2279, 2317, 2355, 2393, 2431, 2469, 2507, 2545, 2583, 2621, 2659, 2697, 2735, 2773, 2811, 2849, 2887]
 		index = grid_cells.index(self)
 		for muro in muri:  # muri = ['avanti', ...]
 			if muro == 'avanti':
-				if posizione == 0 and index > rows - 1:
+				if posizione == 0 and index > cols - 1:
 					self.walls['top'] = False
-					grid_cells[index - rows].walls['bottom'] = False
+					grid_cells[index - cols].walls['bottom'] = False
 				elif posizione == 270 and not index in cell_destra:
 					self.walls['right'] = False
 					grid_cells[index + 1].walls['left'] = False
-				elif posizione == 180 and index < len(grid_cells) - rows:
+				elif posizione == 180 and index < len(grid_cells) - cols:
 					self.walls['bottom'] = False
-					grid_cells[index + rows].walls['top'] = False
+					grid_cells[index + cols].walls['top'] = False
 				elif posizione == 90 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
@@ -293,38 +291,38 @@ class Cell:
 				if posizione == 0 and not index in cell_destra:
 					self.walls['right'] = False
 					grid_cells[index + 1].walls['left'] = False
-				elif posizione == 270 and index < len(grid_cells) - rows:
+				elif posizione == 270 and index < len(grid_cells) - cols:
 					self.walls['bottom'] = False
-					grid_cells[index + rows].walls['top'] = False
+					grid_cells[index + cols].walls['top'] = False
 				elif posizione == 180 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
-				elif posizione == 90 and index > rows - 1:
+				elif posizione == 90 and index > cols - 1:
 					self.walls['top'] = False
-					grid_cells[index - rows].walls['bottom'] = False
+					grid_cells[index - cols].walls['bottom'] = False
 			elif muro == 'sinistra':
 				if posizione == 0 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
-				elif posizione == 270 and index > rows - 1:
+				elif posizione == 270 and index > cols - 1:
 					self.walls['top'] = False
-					grid_cells[index - rows].walls['bottom'] = False
+					grid_cells[index - cols].walls['bottom'] = False
 				elif posizione == 180 and not index in cell_destra:
 					self.walls['right'] = False
 					grid_cells[index + 1].walls['left'] = False
-				elif posizione == 90 and index < len(grid_cells) - rows:
+				elif posizione == 90 and index < len(grid_cells) - cols:
 					self.walls['bottom'] = False
-					grid_cells[index + rows].walls['top'] = False
+					grid_cells[index + cols].walls['top'] = False
 			elif muro == 'dietro':
-				if posizione == 0 and index < len(grid_cells) - rows:
+				if posizione == 0 and index < len(grid_cells) - cols:
 					self.walls['bottom'] = False
-					grid_cells[index + rows].walls['top'] = False
+					grid_cells[index + cols].walls['top'] = False
 				elif posizione == 270 and index % rows != 0:
 					self.walls['left'] = False
 					grid_cells[index - 1].walls['right'] = False
-				elif posizione == 180 and index > rows - 1:
+				elif posizione == 180 and index > cols - 1:
 					self.walls['top'] = False
-					grid_cells[index - rows].walls['bottom'] = False
+					grid_cells[index - cols].walls['bottom'] = False
 				elif posizione == 90 and not index in cell_destra:
 					self.walls['right'] = False
 					grid_cells[index + 1].walls['left'] = False
@@ -358,6 +356,32 @@ class Cell:
 				x = x + TILE/2 - TILE/20
 				y = y + 3
 		return int(x), int(y)   #might need int
+	
+	def torna_indietro(self, posizione, tele):
+		if tele == None:
+			cella_ritorno = grid_cells[1987]
+		elif (dislivello[0] != last_dislivello[0]) and (abs(dislivello[1] - last_dislivello[1]) == 180):  # caso salita e discesa con due livelli
+			for cella in grid_cells:
+				if cella.livello == 0 and cella.placca['dislivello']:  # un solo caso
+					secondo_dislivello = cella
+				elif abs(cella.livello) == 1 and cella.placca['dislivello']: # un solo caso
+					primo_dislivello = cella
+			#if secondo_dislivello.y - tele_liv1.y == 0:  # caso di un ponte
+			if posizione == 90 or posizione == 270:
+				diff = tele.y - secondo_dislivello.y
+				if posizione == 90:
+					cella_ritorno = check_cell(primo_dislivello.x - 1, primo_dislivello.y - diff)
+				elif posizione == 270:
+					cella_ritorno = check_cell(primo_dislivello.x + 1, primo_dislivello.y - diff)
+			elif posizione == 0 or posizione == 180:
+				diff = tele.x - secondo_dislivello.x
+				if posizione == 0:
+					cella_ritorno = check_cell(primo_dislivello.x - diff, primo_dislivello.y - 1)
+				elif posizione == 180:
+					cella_ritorno = check_cell(primo_dislivello.x - diff, primo_dislivello.y + 1)
+		else:
+			cella_ritorno = grid_cells[695]
+		return cella_ritorno 	
 		
 	def vittima(self, vittima_s, vittima_d, posizione, before_cell):
 		#print(bool(grid_cells[5].colore['giallo']['giallo_d'].value))
@@ -449,6 +473,12 @@ class Cell:
 			return False 
 		else:
 			return True
+			
+def check_cell(x, y):
+	find_index = lambda x, y: x + y * cols
+	if x < 0 or x > cols - 1 or y < 0 or y > rows - 1:
+		return False
+	return grid_cells[find_index(x, y)]
 		
 def camere(queue):
 	last_c = centre
@@ -497,7 +527,7 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 	i = index_cell - index_before
 	#print(index_cell, index_before, posizione_dij)
 	if posizione_dij == 0:
-		if i == - rows and not cell.placca['dislivello']:
+		if i == - cols and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
 		elif i == 1:
 			muoviamoci.append('gira a destra')
@@ -509,7 +539,7 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 			if not cell.placca['dislivello']:
 				muoviamoci.append('avanti')
 			posizione_dij = 90
-		elif i == rows:
+		elif i == cols:
 			muoviamoci.append('gira a destra')
 			muoviamoci.append('gira a destra')
 			if not cell.placca['dislivello']:
@@ -518,12 +548,12 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 	elif posizione_dij == 90:   # <--
 		if i == - 1 and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
-		elif i == - rows:
+		elif i == - cols:
 			muoviamoci.append('gira a destra')
 			if not cell.placca['dislivello']:
 				muoviamoci.append('avanti')
 			posizione_dij = 0
-		elif i == rows:
+		elif i == cols:
 			muoviamoci.append('gira a sinistra')
 			if not cell.placca['dislivello']:
 				muoviamoci.append('avanti')
@@ -537,12 +567,12 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 	elif posizione_dij == 270:  # -->
 		if i == 1 and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
-		elif i == rows:
+		elif i == cols:
 			muoviamoci.append('gira a destra')
 			if not cell.placca['dislivello']:
 				muoviamoci.append('avanti')
 			posizione_dij = 180
-		elif i == - rows:
+		elif i == - cols:
 			muoviamoci.append('gira a sinistra')
 			if not cell.placca['dislivello']:
 				muoviamoci.append('avanti')
@@ -554,7 +584,7 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 				muoviamoci.append('avanti')
 			posizione_dij = 90
 	elif posizione_dij == 180:
-		if i == rows and not cell.placca['dislivello']:
+		if i == cols and not cell.placca['dislivello']:
 			muoviamoci.append('avanti')
 		elif i == - 1:
 			muoviamoci.append('gira a destra')
@@ -566,7 +596,7 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 			if not cell.placca['dislivello']:
 				muoviamoci.append('avanti')
 			posizione_dij = 270
-		elif i == -rows:
+		elif i == -cols:
 			muoviamoci.append('gira a destra')
 			muoviamoci.append('gira a destra')
 			if not cell_before.placca['dislivello']:
@@ -576,8 +606,8 @@ def define_posizione(cell_before, cell, posizione_dij, muoviamoci):
 
 		
 def draw_robot(posizione, x, y):
-	x = int(x * TILE + 11) # da cambiare se cambiano rows or cols
-	y = int(y * TILE + 11) # da cambiare se cambiano rows or cols
+	x = int(x * TILE + 6) # da cambiare se cambiano rows or cols
+	y = int(y * TILE + 6) # da cambiare se cambiano rows or cols
 	if posizione == 0:
 		sc.blit(robot_img, (x, y))
 	elif posizione == 90:
@@ -595,13 +625,7 @@ def draw_base():
 	sc.fill(pygame.Color('darkslategray'))
 	[cell.draw() for cell in grid_cells]
 
-'''	
-def closing(signum, frame):
-	print("Chiusura dello script...")
-	led.led_cam_OFF()
 
-signal.signal(signal.SIGINT, closing)
-'''	
 pygame.init()
 sc = pygame.display.set_mode(RES)  # window
 clock = pygame.time.Clock()
@@ -610,7 +634,7 @@ robot_img = pygame.image.load(
 # resize
 width = robot_img.get_rect().width
 height = robot_img.get_rect().height
-robot_img = pygame.transform.scale(robot_img, (TILE - 20, TILE - 20))  # da cambiare se cambiano rows or cols
+robot_img = pygame.transform.scale(robot_img, (TILE - 10, TILE - 10))  # da cambiare se cambiano rows or cols
 
 posizione = 0
 font = pygame.font.Font('freesansbold.ttf', 17)
@@ -618,7 +642,7 @@ font = pygame.font.Font('freesansbold.ttf', 17)
 global grid_cells
 grid_cells = [Cell(col, row) for row in range(rows) for col in range(cols)]
 global centre
-centre = int(cols * rows/2)
+centre = int(cols * rows/2) + 46
 current_cell = grid_cells[centre]
 
 checkpoint = current_cell 
@@ -631,7 +655,16 @@ celle_lack = []
 togli_muro = True
 before_cell = current_cell
 accendere_led = True
-back = True				
+back = True
+
+
+tele_dict = {}
+global dislivello, last_dislivello
+dislivello = []
+last_dislivello = []
+cella_teletrasporto = None
+passaggio = False
+contatore = 0				
 if __name__ == '__main__':
 	#queue = Queue()
 	with open('fermo.txt', 'w') as file:
@@ -658,6 +691,14 @@ if __name__ == '__main__':
 		flag = False if flag == "False" else True
 		if accendere_led and not flag:
 			led.led_cam_ON()
+		if objective.placca['teletrasporto'] and current_cell == objective and passaggio:  #passaggio tele
+			print('PASS')
+			current_cell = tele_dict[objective]
+			tele_dict.popitem()  # ritornato al livello precedente, elimino la coppia di celle dal dict
+			passaggio = False
+			objective = current_cell
+			next_cell = current_cell  # metto l'objective così in modo tale da fare la salita
+		print('curr',grid_cells.index(current_cell))
 		x_robot, y_robot = current_cell.x, current_cell.y
 		current_cell.visited = True
 		draw_base()
@@ -689,26 +730,43 @@ if __name__ == '__main__':
 							checkpoint = next_cell
 							celle_lack.clear()
 						elif condizione == 'discesa' or condizione == 'salita':
-							print('cella salita?', grid_cells.index(next_cell))
-							next_cell.visited = True
-							next_cell.placca['dislivello'] = True
+							last_dislivello = dislivello
+							dislivello = [condizione, posizione]
+							if condizione == 'salita':
+								contatore += 1
+							elif condizione == 'discesa':
+								contatore -= 1
+							#print('cella salita?', grid_cells.index(next_cell))
 							i = grid_cells.index(next_cell)  # number in grid of dislivello
 							next_cell.destroy_wall(posizione, ['avanti'])
 							if posizione == 0:
-								next_cell = grid_cells[i - rows]
+								next_cell = grid_cells[i - cols]
 							elif posizione == 90:
 								next_cell = grid_cells[i - 1]
 							elif posizione == 180:
-								next_cell = grid_cells[i + rows]
+								next_cell = grid_cells[i + cols]
 							elif posizione == 270:
 								next_cell = grid_cells[i + 1]
-							print('cella sucessiva?', grid_cells.index(next_cell))
-							celle_lack.append(next_cell)  #aggiungo quella cella lì
-							if objective == grid_cells[i]:  # se l'obiettivo è la cella dello dislivello
+							#print('cella sucessiva?', grid_cells.index(next_cell))
+							if not grid_cells[i].placca['dislivello']:  # se è la prima volta che passa per lo dislivello
+								grid_cells[i].visited = True
+								grid_cells[i].placca['dislivello'] = True
+								grid_cells[i].livello = contatore 
+								next_cell.visited = True
+								next_cell.placca['teletrasporto'] = True
+								next_cell.livello = contatore
+								cella_teletrasporto = current_cell.torna_indietro(posizione, cella_teletrasporto)  # mi trovo la cella in cui spostarmi
+								tele_dict[cella_teletrasporto] = next_cell  # affido la cella in cui mi sposto quella cella lì
+								next_cell = cella_teletrasporto  # mi sposto
+								next_cell.placca['teletrasporto'] = True
+								next_cell.livello = contatore
+							
+							#celle_lack.append(next_cell)  #aggiungo quella cella lì							
+							if objective == grid_cells[i]:  # se l'obiettivo è la cella della salita
 								objective = next_cell  # obiettivo diventa la cella successiva
 						elif condizione == 'finecorsa':
 							next_cell = current_cell
-							if next_cell in celle_lack:
+							if next_cell in celle_lack:  # se il finecorsa viene attivato due volte, non verrà tolta nessuna cella la seconda volta
 								celle_lack.remove(next_cell)
 							muoviamoci.insert(0, 'avanti')	
 							print('finecorsaaaa', muoviamoci)
@@ -724,9 +782,20 @@ if __name__ == '__main__':
 					#print(grid_cells.index(current_cell))
 				for muro in check:
 					current_cell.destroy_wall(posizione, [muro])
+			#print(grid_cells[1987 - 76].walls)
+			print('obj', grid_cells.index(objective))
 			if objective == current_cell:
 				objective.placca['objective'] = False
-				path, muoviamoci = current_cell.create_dict(None)
+				try:
+					path, muoviamoci = current_cell.create_dict(None)
+					print('normale')
+				except Exception as e:  # passa da un livello all'altro
+					obj = []
+					last_couple =list(tele_dict.keys())[-1]  # prendo la cella teletrasporto
+					obj.append(last_couple)
+					path, muoviamoci = current_cell.create_dict(obj)
+					passaggio = True
+					print('per passare')
 				print('MUOVIAMOCI', muoviamoci)
 				objective = path[-1]
 				objective.placca['objective'] = True

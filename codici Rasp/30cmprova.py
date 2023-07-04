@@ -126,7 +126,7 @@ class Movimenti:
 	def destra(self):
 		z_in = self.bno.readAngle()
 		self.ser.setdestra(3000)
-		sleep(0.2)
+		sleep(0.1)
 		if z_in > 273.6:
 			obiettivo = z_in - 273.6
 			z_at = self.bno.readAngle()
@@ -168,7 +168,7 @@ class Movimenti:
 		#print('FLAG', flag)
 		#print('sono entrato in sinistra')
 			self.ser.setsinistra(3000)
-			sleep(0.2)
+			sleep(0.1)
 			z_in = self.bno.readAngle()
 			if z_in < 84:
 				obiettivo = z_in + 276
@@ -185,7 +185,7 @@ class Movimenti:
 						else:
 							self.ser.setsinistra(1000)
 					else: 
-						#print('pauseeee')
+						print('pauseeee')
 						self.ser.setfermo(0)
 				#print('SONO 11111111111111111111111111')
 				self.ser.setfermo(0)
@@ -203,7 +203,7 @@ class Movimenti:
 						else:
 							self.ser.setsinistra(3000)
 					else:
-						#print('pauseeee')
+						print('pauseeee')
 						self.ser.setfermo(0)
 				#print('SONO 22222222222222222222222222')
 				self.ser.setfermo(0)
@@ -233,28 +233,75 @@ class Movimenti:
 		self.ser.setfermo(0)
 		#print('fatto')
 		sleep(0.01)
-		
+	#--------------------------------------------------------------------------------------------- NUOVO PID GIRO
+	# Funzione per controllare i motori e muovere la macchinina
+	def controlla_motori(self, velocita):
+		print('velocit ' , velocita)
+		imp = self.ser.setavanti(3000-velocita, 3000+velocita)
+		if imp == 'serial error':
+			imp = 0
+		#print(imp)
+		return imp
+	def calcola_output_pid(self, error, imp):
+		if imp!= 80 and self.posizione_attuale !=80:
+			self.P = self.Kp * error
+			self.integral_error += error
+			self.I = self.Ki * self.integral_error
+			self.D = self.Kd * (error - self.last_error)
+			self.last_error = error
+
+			# Calcola l'uscita totale del PID
+			output = self.P + self.I + self.D
+			return output
+		else: 
+			output = 0
+			self.last_error = 0
+			self.integral_error = 0
+			return output
+	#------------------------------------------------------------------------------------------------------------------------	
 	async def first_task(self):
 		self.ferma_cicli = False
-		gyro_value = 0  # Valore del giroscopio
-		self.setpoint = self.asse
-		#print('setpoint', self.setpoint) Kp = 100 Ki = 30 Kd = 0
-		Kp = 0
-		Ki = 0
-		Kd = 0
-		self.Kp = Kp
-		self.Ki = Ki
-		self.Kd = Kd
-		self.error_sum = 0.0
-		self.last_error = 0.0
-		self.last_time = time.time()
-		impulsi_old = 0
-		self.up =0
-		self.right_motor_speed = 0
-		self.left_motor_speed = 0
-		while (self.ferma_cicli == False):
-			self.right_motor_speed, self.left_motor_speed  = self.controlpid(self.asse)
-			await asyncio.sleep(0.001)     
+		self.Kp = 29
+		self.Ki = 0.1
+		self.Kd = 0.01
+		# Variabili globali
+		self.angolo_iniziale = self.bno.readAngle()
+		
+		self.distanza_desiderata = 228
+		self.posizione_attuale = 0
+		self.last_error = 0
+		self.integral_error = 0
+		# Ciclo di controllo
+		nuova_cella = True
+		while self.posizione_attuale < self.distanza_desiderata and self.ferma_cicli == False:
+			flag = get_flag()
+			if not flag:
+				self.angolo_corrente = self.bno.readAngle()
+				self.errore = self.angolo_corrente - self.angolo_iniziale
+				if self.errore < -180:
+					self.errore += 360
+				elif self.errore > 180:
+					self.errore -= 360
+				self.output_pid = self.calcola_output_pid(self.errore, self.posizione_attuale)
+				if self.output_pid > 2000:
+					self.last_error = 0
+					self.integral_error = 0
+					self.output_pid = 2000
+				self.posizione_attuale = self.controlla_motori(self.output_pid)
+				# Attendere un breve periodo di tempo per il movimento della macchinina
+				if self.posizione_attuale > 114 and nuova_cella:
+					with open('valore.txt', 'r') as file:
+						index_next_cell = int(file.readline().strip())
+					queue.put('cella')
+					queue.put(index_next_cell)
+					nuova_cella = False
+					self.cella_successiva = True
+				sleep(0.05) 
+				await asyncio.sleep(0.001)
+			else:
+				self.ser.setfermoflag(0)
+		self.ferma_cicli=True
+		return '30cm'    
 	async def second_task(self):
 		self.ferma_cicli = False
 		while (self.ferma_cicli == False):
@@ -273,47 +320,20 @@ class Movimenti:
 					else:
 						self.situazione = 'finecorsa'
 					self.ferma_cicli = True
-			#print('VRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR',self.inclinazione)
-			if (self.inclinazione < -20):
+			if self.inclinazione <40 or self.inclinazione>40:
+				print('ERRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR', self.inclinazione)
+			if (self.inclinazione < -22) and (self.inclinazione>-90):
 				self.situazione = 'salita'
 				self.ferma_cicli = True
-			if (self.inclinazione > 20):
+			if (self.inclinazione > 22) and self.inclinazione<90:
 				self.situazione = 'discesa'
 				self.ferma_cicli = True
 			#print('fatto')
 			await asyncio.sleep(0.001)
-	async def third_task(self):
-		nuova_cella = True
-		self.ferma_cicli = False
-		while (self.ferma_cicli == False):
-			flag = get_flag()
-			if not flag:
-				self.ser.clean()
-				imp = self.ser.setavanti(3000-self.right_motor_speed, 3000-self.left_motor_speed)
-				self.right_motor_speed = 0
-				self.left_motor_speed = 0
-				#print(imp)
-				if imp == 'serial error':
-					imp = 20
-				#print(imp)
-				if imp > 110 and nuova_cella:
-					with open('valore.txt', 'r') as file:
-						index_next_cell = int(file.readline().strip())
-					queue.put('cella')
-					queue.put(index_next_cell)
-					nuova_cella = False
-					self.cella_successiva = True
-				if imp > 228:
-					self.ferma_cicli = True
-					break
-				await asyncio.sleep(0.001)
-			else:
-				self.ser.setfermoflag(0)
-		return '30cm'
 		
 	async def main(self):
-		results = await asyncio.gather(self.first_task(), self.second_task(), self.third_task())
-		self.first_task_result, self.second_task_result, self.third_task_result = results
+		results = await asyncio.gather(self.first_task(), self.second_task())
+		self.first_task_result, self.second_task_result = results
 		self.ferma_cicli = False
 	'''
 	val = self.piastre.fermaa()  # 30 cm!!!!!
@@ -326,12 +346,10 @@ class Movimenti:
 		self.stuazione = 'blu'
 	'''	
 	def partenza(self):
-		pias = 'serial error'
-		while pias == 'serial error':
-			pias = self.ser.piastre()
-			#print('inizio piastre ',pias)
-		pias = pias*3.92
-		self.last_colo = pias
+		self.led.led_sotto_ON()
+		sleep(0.1)
+		val = self.piastre.fermaa()
+		self.last_colori = val
 			
 	def cm30(self):
 		self.dritta()
@@ -348,7 +366,7 @@ class Movimenti:
 		self.ser.clean()
 		while True:
 			asyncio.run(self.main())
-			if (self.second_task_result == 'nero') or (self.second_task_result == 'finecorsa') or (self.third_task_result == '30cm'):
+			if (self.second_task_result == 'nero') or (self.second_task_result == 'finecorsa') or (self.first_task_result == '30cm'):
 				break
 		self.ser.setfermo(0)
 		#self.inclinazione = self.bno.inclinazione()
@@ -376,7 +394,7 @@ class Movimenti:
 			self.impulsisd=0
 			self.ser.azzeroimpulsi()
 			sleep(0.1)
-			while (self.impulsisd < 60):
+			while (self.impulsisd < 30):
 				self.impulsisd = self.ser.setavanti(3000, 3000)
 				if self.impulsisd== 'serial error':
 					self.impulsisd=0
@@ -397,11 +415,11 @@ class Movimenti:
 					self.ser.setavanti(3000, 3000)
 				sleep(0.05)
 				self.inclinazione = self.bno.inclinazione()
-				#print(self.inclinazione)
+				print(self.inclinazione)
 			self.impulsisd=0
 			self.ser.azzeroimpulsi()
 			sleep(0.1)
-			#print(self.impulsisd)
+			print(self.impulsisd)
 			while (self.impulsisd < 30):
 				self.impulsisd = self.ser.setavanti(3000, 3000)
 				if self.impulsisd =='serial error':
@@ -455,14 +473,7 @@ class Movimenti:
 			else:
 				self.situazione = 'finecorsa'
 			self.ser.setfermo(0)
-		self.colori = 0
 		if self.situazione=='finecorsa':
-			val = self.piastre.fermaa() 
-			if (val[1] > 500) and (val[2] > 500) and (val[3] > 500 and val[3] < 2300):
-				print('bluu')
-				self.colori='blu'
-				self.ser.setfermo(0)
-				sleep(5)
 			if self.laser.read(0)<15:
 				self.ser.azzeroimpulsi()
 				while (self.impulsi2 < 24):
@@ -481,27 +492,20 @@ class Movimenti:
 				if self.impulsi2 == 'serial error':
 					self.impulsi2 = 3
 			self.ser.setfermo(0)
-		self.ser.clean()
-		pias = self.ser.piastre()
-		if pias == 'serial error':
-			pias = self.last_colo/3.92
-		pias = pias*3.92
-		#print('piastra attuale', pias)
-		if pias == 'serial error':
-			pias = self.last_colo
-		val = self.piastre.fermaa() 
-		if (val[1] > 500) and (val[2] > 500) and (val[3] > 500 and val[3] < 2300) and self.colori!='blu':
+		val = self.piastre.fermaa()  
+		self.colori = 0
+		if (val[1] - 500 < self.last_colori[1] < val[1] + 500) and (val[2] - 500 < self.last_colori[2] < val[2] + 500) and (val[3] - 500 < self.last_colori[3] < val[3] + 500):
+			self.last_colori = val
+			self.colori = 'bianco'
+			print('biancoo')
+		elif (val[1] > self.last_colori[1] + 500) and (val[2] > self.last_colori[2] + 600) and (val[3] > self.last_colori[3] + 600):
+			self.colori = 'argento'
+			print('argentoo')
+		elif (val[1] > 500) and (val[2] > 500) and (val[3] > 500 and val[3] < 2300):
 			self.colori = 'blu'
 			print('bluu')
 			self.ser.setfermo(0)
 			sleep(5)
-		elif self.last_colo > pias +65:
-			self.colori = 'argento'
-			print('argento')
-		elif pias-65 < self.last_colo < pias+65:
-			print('bianco')
-			self.last_colo = pias
-			self.colori = 'bianco'
 		else:
 			print('rifjrok')
 		uscita = []
@@ -523,7 +527,10 @@ class Movimenti:
 			uscita.append(301)
 		self.ser.setfermo(0)
 		return uscita
-
+		print('post')
+		self.impulsi = 0 
+		self.impulsi2 = 0
+		sleep(0.1)
 
 				
 	def dritta(self):
@@ -583,15 +590,13 @@ if __name__ == '__main__':
 	sleep(1)
 	mov.partenza()	
 	while True:
-		mov.cm30()
-		'''
+		
 		if laser.read(0)<150:
 			mov.destra()
 		if laser.read(5)<120:
 			mov.riposizionamento()
 		mov.cm30()
 		sleep(0.1)
-		'''
 		'''
 		mov.cm30()
 		t0 = time.time()

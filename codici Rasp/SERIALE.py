@@ -200,9 +200,15 @@ class Serial:
 		for ind in range(nByte):
 			self.write(byteOut[ind])'''
 	#--------------------------------------------------------------------------------------------------------------
-	
-		
-	
+	def piastre(self):
+		nByte = 1
+		byteOut =[0]*nByte
+		byteOut[0] = (1<<7)|(0<<6)|(0<<5)|(1<<4)|(0<<3)|(1<<2)|(0<<1)|(0<<0)
+		for ind in range(nByte):
+			self.write(byteOut[ind])
+		self.clean()
+		colore = self.read()
+		return colore
 		
    
 	def clean(self):

@@ -23,21 +23,21 @@ class Servo:
 		self.SERVO = 18
 		self.pi = pigpio.pi()
 		self.pi.set_mode(self.SERVO, pigpio.OUTPUT)
-		self.pi.set_servo_pulsewidth(self.SERVO, 1700) # posizione neutra
+		self.pi.set_servo_pulsewidth(self.SERVO, 1900) # posizione neutra
 		self.contatore = 0
 		
 	def sinistra(self):
 		if self.contatore < 12:
-			self.pi.set_servo_pulsewidth(self.SERVO, 2250) # posizione massima
+			self.pi.set_servo_pulsewidth(self.SERVO, 2450) # posizione massima
 			sleep(0.5)
-			self.pi.set_servo_pulsewidth(self.SERVO, 1700) # posizione neutra
+			self.pi.set_servo_pulsewidth(self.SERVO, 1900) # posizione neutra
 			sleep(0.5)
 			self.contatore += 1 
 	def destra(self):
 		if self.contatore < 12:
-			self.pi.set_servo_pulsewidth(self.SERVO, 1100) # posizione minima
+			self.pi.set_servo_pulsewidth(self.SERVO, 1300) # posizione minima
 			sleep(0.5)
-			self.pi.set_servo_pulsewidth(self.SERVO, 1700) # posizione neutra
+			self.pi.set_servo_pulsewidth(self.SERVO, 1900) # posizione neutra
 			sleep(0.5)
 			self.contatore += 1 
 		
