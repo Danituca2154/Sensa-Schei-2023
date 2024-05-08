@@ -9,4 +9,5 @@ ITIS Silvio De Pretto, SCHIO (VI)
 https://www.depretto.edu.it/pagine/litis-de-pretto-campione-italiano-di-robocup-junior
 
 VIDEO GARE NAZIONALI ROBOCUP JUNIOR VERBANIA 2024
+
 https://drive.google.com/drive/folders/1-HMByTuPI5-7_rOt5_-AOYz_q1ojtnR8?usp=sharing
